@@ -16,18 +16,22 @@
         }
         .idea { background: var(--mint); }
         .plan { background: var(--lavender); }
-        .sticker h3 { font-size: 15px; margin: 0 0 5px; color: #333; overflow: hidden; text-overflow: ellipsis; }
-        .sticker p { font-size: 12px; color: #666; margin: 0; overflow: hidden; }
+        .sticker h3 { font-size: 15px; margin: 0 0 5px; color: #333; overflow: hidden; text-overflow: ellipsis; height: 20px; }
+        .sticker p { font-size: 12px; color: #666; margin: 0; overflow: hidden; white-space: pre-wrap; }
+        
+        /* Окно редактора */
         .modal { 
             display: none; position: fixed; top: 0; left: 0; 
-            width: 100%; height: 100%; background: white; z-index: 1000; padding: 20px; box-sizing: border-box; 
+            width: 100%; height: 100%; z-index: 1000; padding: 20px; box-sizing: border-box; 
         }
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .save-btn { background: #5c6bc0; color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; }
-        textarea { width: 100%; height: 70%; border: none; outline: none; font-size: 18px; line-height: 1.6; resize: none; }
-        input#edit-title { width: 100%; font-size: 22px; border: none; font-weight: bold; margin-bottom: 15px; outline: none; }
+        
+        textarea { width: 100%; height: 75%; border: none; outline: none; font-size: 18px; line-height: 1.6; resize: none; background: transparent; }
+        input#edit-title { width: 100%; font-size: 22px; border: none; font-weight: bold; margin-bottom: 15px; outline: none; background: transparent; }
+        
         .btn-panel { position: fixed; bottom: 30px; left: 0; width: 100%; display: flex; gap: 15px; justify-content: center; z-index: 500; }
-        .add-btn { padding: 12px 25px; border-radius: 30px; border: none; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .add-btn { padding: 12px 25px; border-radius: 30px; border: none; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; }
     </style>
 </head>
 <body>
@@ -41,63 +45,68 @@
 
 <div id="modal" class="modal">
     <div class="controls">
-        <div onclick="closeEditor()" style="cursor: pointer; color: #666;">← Отмена</div>
+        <div onclick="closeEditor()" style="cursor: pointer; color: #444; font-weight: 500;">← Назад</div>
         <div class="save-btn" onclick="saveData()">Сохранить</div>
     </div>
-    <input type="text" id="edit-title" placeholder="Заголовок...">
-    <textarea id="edit-content" placeholder="Начни писать здесь..."></textarea>
+    <input type="text" id="edit-title" placeholder="Заголовок">
+    <textarea id="edit-content" placeholder="Начни писать..."></textarea>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // Загрузка данных с защитой от ошибок
-    let notes = [];
-    try {
-        const saved = localStorage.getItem('my_board_notes_v3');
-        notes = saved ? JSON.parse(saved) : [
-            { id: 1, type: 'idea', title: 'Твоя идея', content: 'Нажми, чтобы отредактировать', angle: -2 },
-            { id: 2, type: 'plan', title: 'Твой план', content: '1. Начни список\n2. Нажми Enter', angle: 2 }
-        ];
-    } catch (e) {
-        notes = [{ id: 1, type: 'idea', title: 'Ошибка памяти', content: 'Но ты можешь создать новые!', angle: 0 }];
-    }
-
+    let notes = JSON.parse(localStorage.getItem('my_board_notes_v4')) || [];
     let currentId = null;
 
     function render() {
         const board = document.getElementById('board');
-        if (!board) return;
         board.innerHTML = '';
         notes.forEach(n => {
             const div = document.createElement('div');
             div.className = 'sticker ' + n.type;
             div.style.transform = 'rotate(' + n.angle + 'deg)';
             div.onclick = function() { openEditor(n.id); };
-            div.innerHTML = '<h3>' + (n.title || (n.type === 'idea' ? 'Идея' : 'План')) + '</h3><p>' + n.content + '</p>';
+            div.innerHTML = '<h3>' + (n.title  '') + '</h3><p>' + (n.content  '') + '</p>';
             board.appendChild(div);
         });
     }
+
     window.handleNew = function(type) {
         const id = Date.now();
-        notes.push({ id: id, type: type, title: '', content: '', angle: (Math.random() * 6 - 3).toFixed(1) });
+        let initialContent = '';
+        if (type === 'plan') initialContent = '1. ';
+        
+        notes.push({ 
+            id: id, 
+            type: type, 
+            title: '', 
+            content: initialContent, 
+            angle: (Math.random() * 6 - 3).toFixed(1) 
+        });
         openEditor(id);
     };
-
     window.openEditor = function(id) {
         currentId = id;
-        const note = notes.find(function(n) { return n.id === id; });
+        const note = notes.find(n => n.id === id);
+        const modal = document.getElementById('modal');
+        
+        // Цвет окна в зависимости от типа стикера
+        modal.style.backgroundColor = (note.type === 'idea') ? '#e2f5ee' : '#f3e5f5';
+        
         document.getElementById('edit-title').value = note.title;
         document.getElementById('edit-content').value = note.content;
-        document.getElementById('modal').style.display = 'block';
+        modal.style.display = 'block';
+        
+        // Фокус на поле ввода
+        document.getElementById('edit-content').focus();
     };
 
     window.saveData = function() {
-        const note = notes.find(function(n) { return n.id === currentId; });
+        const note = notes.find(n => n.id === currentId);
         note.title = document.getElementById('edit-title').value;
         note.content = document.getElementById('edit-content').value;
-        localStorage.setItem('my_board_notes_v3', JSON.stringify(notes));
+        localStorage.setItem('my_board_notes_v4', JSON.stringify(notes));
         render();
         closeEditor();
     };
@@ -106,10 +115,9 @@
         document.getElementById('modal').style.display = 'none';
     };
 
-    // Авто-список
     document.getElementById('edit-content').onkeydown = function(e) {
         if (e.key === 'Enter') {
-            const note = notes.find(function(n) { return n.id === currentId; });
+            const note = notes.find(n => n.id === currentId);
             if (note && note.type === 'plan') {
                 const pos = this.selectionStart;
                 const textBefore = this.value.substring(0, pos);
