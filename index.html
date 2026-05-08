@@ -7,27 +7,27 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root { --bg: #fdfdfd; --mint: #e2f5ee; --lavender: #f3e5f5; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; overflow-x: hidden; }
         .board { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding-bottom: 100px; }
         .sticker { 
             width: 140px; height: 140px; padding: 15px; 
             box-shadow: 4px 4px 10px rgba(0,0,0,0.06); 
             cursor: pointer; display: flex; flex-direction: column; box-sizing: border-box;
+            border-radius: 2px; transition: transform 0.2s;
         }
         .idea { background: var(--mint); }
         .plan { background: var(--lavender); }
-        .sticker h3 { font-size: 15px; margin: 0 0 5px; color: #333; overflow: hidden; text-overflow: ellipsis; height: 20px; }
-        .sticker p { font-size: 12px; color: #666; margin: 0; overflow: hidden; white-space: pre-wrap; }
+        .sticker h3 { font-size: 14px; margin: 0 0 5px; color: #333; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .sticker p { font-size: 11px; color: #666; margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
         
-        /* Окно редактора */
         .modal { 
             display: none; position: fixed; top: 0; left: 0; 
             width: 100%; height: 100%; z-index: 1000; padding: 20px; box-sizing: border-box; 
         }
         .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .save-btn { background: #5c6bc0; color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; }
+        .save-btn { background: #5c6bc0; color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
         
-        textarea { width: 100%; height: 75%; border: none; outline: none; font-size: 18px; line-height: 1.6; resize: none; background: transparent; }
+        textarea { width: 100%; height: 70%; border: none; outline: none; font-size: 18px; line-height: 1.6; resize: none; background: transparent; }
         input#edit-title { width: 100%; font-size: 22px; border: none; font-weight: bold; margin-bottom: 15px; outline: none; background: transparent; }
         
         .btn-panel { position: fixed; bottom: 30px; left: 0; width: 100%; display: flex; gap: 15px; justify-content: center; z-index: 500; }
@@ -65,17 +65,17 @@
         notes.forEach(n => {
             const div = document.createElement('div');
             div.className = 'sticker ' + n.type;
-            div.style.transform = 'rotate(' + n.angle + 'deg)';
+            div.style.transform = `rotate(${n.angle}deg)`;
             div.onclick = function() { openEditor(n.id); };
-            div.innerHTML = '<h3>' + (n.title  '') + '</h3><p>' + (n.content  '') + '</p>';
+            // Исправлено: добавлены операторы || для пустых строк
+            div.innerHTML = '<h3>' + (n.title || '...') + '</h3><p>' + (n.content || '') + '</p>';
             board.appendChild(div);
         });
     }
 
     window.handleNew = function(type) {
         const id = Date.now();
-        let initialContent = '';
-        if (type === 'plan') initialContent = '1. ';
+        let initialContent = (type === 'plan') ? '1. ' : '';
         
         notes.push({ 
             id: id, 
@@ -84,31 +84,34 @@
             content: initialContent, 
             angle: (Math.random() * 6 - 3).toFixed(1) 
         });
+        
+        render(); // Обновляем доску перед открытием
         openEditor(id);
     };
     
     window.openEditor = function(id) {
         currentId = id;
         const note = notes.find(n => n.id === id);
+        if (!note) return;
+
         const modal = document.getElementById('modal');
-        
-        // Цвет окна в зависимости от типа стикера
         modal.style.backgroundColor = (note.type === 'idea') ? '#e2f5ee' : '#f3e5f5';
         
         document.getElementById('edit-title').value = note.title;
         document.getElementById('edit-content').value = note.content;
         modal.style.display = 'block';
         
-        // Фокус на поле ввода
-        document.getElementById('edit-content').focus();
+        setTimeout(() => document.getElementById('edit-content').focus(), 50);
     };
 
     window.saveData = function() {
         const note = notes.find(n => n.id === currentId);
-        note.title = document.getElementById('edit-title').value;
-        note.content = document.getElementById('edit-content').value;
-        localStorage.setItem('my_board_notes_v4', JSON.stringify(notes));
-        render();
+        if (note) {
+            note.title = document.getElementById('edit-title').value;
+            note.content = document.getElementById('edit-content').value;
+            localStorage.setItem('my_board_notes_v4', JSON.stringify(notes));
+            render();
+        }
         closeEditor();
     };
 
@@ -116,6 +119,7 @@
         document.getElementById('modal').style.display = 'none';
     };
 
+    // Автоматическая нумерация для планов
     document.getElementById('edit-content').onkeydown = function(e) {
         if (e.key === 'Enter') {
             const note = notes.find(n => n.id === currentId);
@@ -125,6 +129,7 @@
                 const lines = textBefore.split('\n');
                 const lastLine = lines[lines.length - 1];
                 const match = lastLine.match(/^(\d+)\./);
+                
                 if (match) {
                     e.preventDefault();
                     const nextNum = parseInt(match[1]) + 1;
@@ -136,6 +141,7 @@
         }
     };
 
+    // Инициализация при загрузке
     render();
 </script>
 </body>
