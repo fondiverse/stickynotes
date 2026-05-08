@@ -1,45 +1,125 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Доска</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Творческая Доска</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #f0f0f0; font-family: sans-serif; padding: 20px; }
-        .board { display: flex; flex-wrap: wrap; gap: 10px; }
+        :root { --bg: #fdfdfd; --mint: #e2f5ee; --lavender: #f3e5f5; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .board { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; padding-bottom: 100px; }
+        
         .sticker { 
-            width: 140px; height: 140px; padding: 10px; 
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-            background: #e2f5ee; /* Мятный по умолчанию */
+            width: 140px; height: 140px; padding: 15px; 
+            box-shadow: 4px 4px 10px rgba(0,0,0,0.06); 
+            cursor: pointer; display: flex; flex-direction: column; box-sizing: border-box;
         }
-        .plan { background: #f3e5f5; } /* Лавандовый */
-        .btn-panel { position: fixed; bottom: 20px; width: 100%; display: flex; gap: 10px; justify-content: center; left: 0; }
-        button { padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .idea { background: var(--mint); }
+        .plan { background: var(--lavender); }
+        .sticker h3 { font-size: 15px; margin: 0 0 5px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sticker p { font-size: 12px; color: #666; margin: 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .modal { 
+            display: none; position: fixed; top: 0; left: 0; 
+            width: 100%; height: 100%; background: white; z-index: 1000; padding: 20px; box-sizing: border-box; 
+        }
+        .controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .save-btn { background: #5c6bc0; color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        
+        textarea { width: 100%; height: 70%; border: none; outline: none; font-size: 18px; line-height: 1.6; resize: none; }
+        input#edit-title { width: 100%; font-size: 22px; border: none; font-weight: bold; margin-bottom: 15px; outline: none; }
+
+        .btn-panel { position: fixed; bottom: 30px; left: 0; width: 100%; display: flex; gap: 15px; justify-content: center; }
+        .add-btn { padding: 12px 25px; border-radius: 30px; border: none; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.1); cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="board" class="board">
-    <div class="sticker"><h3>Идея</h3><p>Нажми на кнопку внизу, чтобы добавить новую</p></div>
-    <div class="sticker plan"><h3>План</h3><p>Это лавандовый стикер для списка</p></div>
-</div>
+<div id="board" class="board"></div>
 
 <div class="btn-panel">
-    <button onclick="addSticker('#e2f5ee')">+ Идея</button>
-    <button onclick="addSticker('#f3e5f5')">+ План</button>
+    <button class="add-btn" style="background: var(--mint);" onclick="createNew('idea')">+ Идея</button>
+    <button class="add-btn" style="background: var(--lavender);" onclick="createNew('plan')">+ План</button>
+</div>
+
+<div id="modal" class="modal">
+    <div class="controls">
+        <div onclick="closeEditor()" style="cursor: pointer; color: #666;">← Отмена</div>
+        <div class="save-btn" onclick="saveData()">Сохранить</div>
+    </div>
+    <input type="text" id="edit-title" placeholder="Заголовок...">
+    <textarea id="edit-content" placeholder="Начни писать здесь..."></textarea>
 </div>
 
 <script>
-    function addSticker(color) {
-        const board = document.getElementById('board');
-        const newSticker = document.createElement('div');
-        newSticker.className = 'sticker';
-        if(color === '#f3e5f5') newSticker.classList.add('plan');
-        newSticker.style.transform = "rotate(" + (Math.random() * 6 - 3) + "deg)";
-        newSticker.innerHTML = "<h3>Новый</h3><p>Текст заметки...</p>";
-        board.appendChild(newSticker);
-    }
-</script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
 
+    let notes = JSON.parse(localStorage.getItem('my_board_notes')) || [
+        { id: 1, type: 'idea', title: 'Моя идея', content: 'Нажми, чтобы изменить', angle: -2 },
+        { id: 2, type: 'plan', title: 'Список дел', content: '1. Купить хлеб', angle: 2 }
+    ];
+    let currentId = null;
+
+    function render() {
+        const board = document.getElementById('board');
+        board.innerHTML = '';
+        notes.forEach(n => {
+            const div = document.createElement('div');
+            div.className = sticker ${n.type};
+            div.style.transform = rotate(${n.angle}deg);
+            div.onclick = () => openEditor(n.id);
+            div.innerHTML = <h3>${n.title || 'Без названия'}</h3><p>${n.content}</p>;
+            board.appendChild(div);
+        });
+    }
+
+    window.createNew = function(type) {
+        const id = Date.now();
+        notes.push({ id, type, title: '', content: '', angle: (Math.random() * 6 - 3).toFixed(1) });
+        openEditor(id);
+    };
+    window.openEditor = function(id) {
+        currentId = id;
+        const note = notes.find(n => n.id === id);
+        document.getElementById('edit-title').value = note.title;
+        document.getElementById('edit-content').value = note.content;
+        document.getElementById('modal').style.display = 'block';
+    };
+
+    window.saveData = function() {
+        const note = notes.find(n => n.id === currentId);
+        note.title = document.getElementById('edit-title').value;
+        note.content = document.getElementById('edit-content').value;
+        localStorage.setItem('my_board_notes', JSON.stringify(notes));
+        render();
+        closeEditor();
+    };
+
+    window.closeEditor = function() { document.getElementById('modal').style.display = 'none'; };
+
+    document.getElementById('edit-content').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const note = notes.find(n => n.id === currentId);
+            if (note && note.type === 'plan') {
+                const pos = this.selectionStart;
+                const textBefore = this.value.substring(0, pos);
+                const lines = textBefore.split('\n');
+                const lastLine = lines[lines.length - 1];
+                const match = lastLine.match(/^(\d+)\./);
+                if (match) {
+                    e.preventDefault();
+                    const nextNum = parseInt(match[1]) + 1;
+                    const insert = '\n' + nextNum + '. ';
+                    this.value = this.value.substring(0, pos) + insert + this.value.substring(pos);
+                    this.selectionStart = this.selectionEnd = pos + insert.length;
+                }
+            }
+        }
+    });
+
+    render();
+</script>
 </body>
 </html>
